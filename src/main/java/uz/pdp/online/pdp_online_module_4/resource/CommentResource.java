@@ -9,6 +9,8 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.reactive.function.client.WebClient;
 import uz.pdp.online.pdp_online_module_4.dto.CommentCreateDTO;
 import uz.pdp.online.pdp_online_module_4.dto.CommentDTO;
 
@@ -20,6 +22,7 @@ import java.util.List;
 public class CommentResource {
 
     private final RestTemplate restTemplate;
+    private final WebClient webClient;
 
     @Value("${comments.url.postComments}")
     private String postCommentsURL;
@@ -29,21 +32,32 @@ public class CommentResource {
 
 
     public List<CommentDTO> getAllComments(@NonNull Integer postID) {
-        // ResponseEntity<List> responseEntity = restTemplate.getForEntity(url, List.class, post.getId());
-        // List comments = responseEntity.getBody();
-        // List comments = restTemplate.getForObject(url, List.class, post.getId());
-        // HttpHeaders headers = new HttpHeaders();
-        // headers.add("Authorization", "Bearer token................");
-        // headers.setBearerAuth("token");
-        // headers.setBasicAuth("username","123");
-        // headers.add(HttpHeaders.CONTENT_TYPE, "application/json");
-        // HttpEntity<Object> httpEntity = new HttpEntity<>(new Object(), headers);
+        // return getCommentsWithRestTemplate(postID);
+        return getCommentsWithWebClient(postID);
+    }
+
+    public void saveAll(List<CommentCreateDTO> commentCreateDTOS) {
+        // saveCommentsWithRestTemplate(commentCreateDTOS);
+        saveCommentsWithWebClient(commentCreateDTOS);
+    }
+
+    private List<CommentDTO> getCommentsWithWebClient(Integer postID) {
+        return webClient
+                .get()
+                .uri(postCommentsURL, postID)
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<List<CommentDTO>>() { })
+                .block();
+    }
+
+    private List<CommentDTO> getCommentsWithRestTemplate(Integer postID) {
         try {
             return restTemplate.exchange(
                     postCommentsURL,
                     HttpMethod.GET,
                     HttpEntity.EMPTY,
-                    new ParameterizedTypeReference<List<CommentDTO>>() {},
+                    new ParameterizedTypeReference<List<CommentDTO>>() {
+                    },
                     postID).getBody();
         } catch (ResourceAccessException e) {
             e.printStackTrace();
@@ -51,7 +65,16 @@ public class CommentResource {
         return Collections.emptyList();
     }
 
-    public void saveAll(List<CommentCreateDTO> commentCreateDTOS) {
+    private void saveCommentsWithWebClient(List<CommentCreateDTO> commentCreateDTOS) {
+        webClient.post()
+                .uri(saveCommentsURL)
+                .body(BodyInserters.fromValue(commentCreateDTOS))
+                .retrieve()
+                .bodyToMono(Void.class)
+                .block();
+    }
+
+    private void saveCommentsWithRestTemplate(List<CommentCreateDTO> commentCreateDTOS) {
         HttpEntity<List<CommentCreateDTO>> httpEntity = new HttpEntity<>(commentCreateDTOS);
         restTemplate.exchange(saveCommentsURL, HttpMethod.POST, httpEntity, Void.class);
     }
